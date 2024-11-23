@@ -59,7 +59,7 @@
         try {
           // Check and make sure that AssignmentGroup.course_id matches CourseInfo.id
           if (AssignmentGroup.course_id !== CourseInfo.id) {
-            throw new Error("AssignmentGroup doesn't belong to the Course.");
+            throw new Error("Assignment Group doesn't belong to the Course.");
           }
           
           const now = new Date();
@@ -72,13 +72,13 @@
             if (typeof points_possible !== 'number') {
               points_possible = Number(points_possible);
               if (isNaN(points_possible)) {
-                console.warn(`Incorrect points_possible for assignment ${assignment.id}, skipping assignment.`);
+                console.warn(`Incorrect points possible for the assignment ${assignment.id}, skipping assignment.`);
                 continue; 
               }
             }
             const due_at = new Date(assignment.due_at);
             if (isNaN(due_at.getTime())) {
-              console.warn(`Incorrect due_at date for assignment ${assignment.id}, skipping assignment.`);
+              console.warn(`Incorrect due date for the assignment ${assignment.id}, skipping assignment.`);
               continue; 
             }
       
@@ -90,7 +90,7 @@
       
           // If no due assignments, return empty results
           if (Object.keys(assignments_map).length === 0) {
-            console.warn('No assignments are due yet.');
+            console.warn('No assignments are due at this time.');
             return [];
           }
       
@@ -104,19 +104,19 @@
       
             // Check the submission data to make sure its correct
             if (!submission || typeof submission.submitted_at !== 'string') {
-              console.warn(`Invalid submission data for learner ${learner_id}, assignment ${assignment_id}`);
+              console.warn(`Incorrect submission data for learner ${learner_id}, assignment ${assignment_id}`);
               continue; 
             }
             const submitted_at = new Date(submission.submitted_at);
             if (isNaN(submitted_at.getTime())) {
-              console.warn(`Invalid submitted_at date for learner ${learner_id}, assignment ${assignment_id}`);
+              console.warn(`Incorrect submission date for learner ${learner_id}, assignment ${assignment_id}`);
               continue; 
             }
             let score = submission.score;
             if (typeof score !== 'number') {
               score = Number(score);
               if (isNaN(score)) {
-                console.warn(`Invalid score for learner ${learner_id}, assignment ${assignment_id}`);
+                console.warn(`You have an incorrect score for learner ${learner_id}, assignment ${assignment_id}`);
                 score = 0; // Treat invalid score as if its zero
               }
             }
