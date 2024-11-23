@@ -146,7 +146,7 @@
               const points_possible = assignment.points_possible;
       
               if (typeof points_possible !== 'number' || points_possible === 0) {
-                // Cannot /0 so skip this assignment
+                // Cannot /0(divide by zero) so skip this assignment
                 continue;
               }
       
