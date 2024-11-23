@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SBA 308: JavaScript Fundamentals</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    pre {
+      background: #f4f4f4;
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+    h2 {
+      color: #333;
+    }
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .result {
+      background: #e6ffe6;
+      padding: 10px;
+      border: 1px solid #b3ffb3;
+    }
+    .error {
+      background: #ffe6e6;
+      padding: 10px;
+      border: 1px solid #ffb3b3;
+      color: #a94442;
+    }
+    .warning {
+      color: #a67c00;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>SBA 308: JavaScript Fundamentals</h1>
+
+    <h2>Input Data:</h2>
+
+    <h3>Course Info:</h3>
+    <pre id="courseInfo"></pre>
+
+    <h3>Assignment Group:</h3>
+    <pre id="assignmentGroup"></pre>
+
+    <h3>Learner Submissions:</h3>
+    <pre id="learnerSubmissions"></pre>
+
+    <h2>Output:</h2>
+    <div id="output"></div>
+
+    <script>
+      function getLearnerData(CourseInfo, AssignmentGroup, LearnerSubmissions) {
+        try {
+          // Check and make sure that AssignmentGroup.course_id matches CourseInfo.id
+          if (AssignmentGroup.course_id !== CourseInfo.id) {
+            throw new Error("AssignmentGroup doesn't belong to the Course.");
+          }
+          
+          const now = new Date();
+      
+          // Collect all the assignments that are due
+          const assignments_map = {}; // assignment_id => AssignmentInfo
+          for (const assignment of AssignmentGroup.assignments) {
+            // Check the assignment data
+            let points_possible = assignment.points_possible;
+            if (typeof points_possible !== 'number') {
+              points_possible = Number(points_possible);
+              if (isNaN(points_possible)) {
+                console.warn(`Incorrect points_possible for assignment ${assignment.id}, skipping assignment.`);
+                continue; 
+              }
+            }
+            const due_at = new Date(assignment.due_at);
+            if (isNaN(due_at.getTime())) {
+              console.warn(`Incorrect due_at date for assignment ${assignment.id}, skipping assignment.`);
+              continue; 
+            }
+      
+            if (due_at <= now) {
+              
+              assignments_map[assignment.id] = assignment;
+            }
+          }
+      
+          // If no due assignments, return empty results
+          if (Object.keys(assignments_map).length === 0) {
+            console.warn('No assignments are due yet.');
+            return [];
+          }
+      
+          // Build a mapping of learner_id
+          const learners_submissions = {}; 
+      
+          for (const submissionRecord of LearnerSubmissions) {
+            const learner_id = submissionRecord.learner_id;
+            const assignment_id = submissionRecord.assignment_id;
+            const submission = submissionRecord.submission;
+      
+            // Check the submission data to make sure its correct
+            if (!submission || typeof submission.submitted_at !== 'string') {
+              console.warn(`Invalid submission data for learner ${learner_id}, assignment ${assignment_id}`);
+              continue; 
+            }
+            const submitted_at = new Date(submission.submitted_at);
+            if (isNaN(submitted_at.getTime())) {
+              console.warn(`Invalid submitted_at date for learner ${learner_id}, assignment ${assignment_id}`);
+              continue; 
+            }
+            let score = submission.score;
+            if (typeof score !== 'number') {
+              score = Number(score);
+              if (isNaN(score)) {
+                console.warn(`Invalid score for learner ${learner_id}, assignment ${assignment_id}`);
+                score = 0; // Treat invalid score as if its zero
+              }
+            }
+      
+            if (!learners_submissions[learner_id]) {
+              learners_submissions[learner_id] = {};
+            }
+            learners_submissions[learner_id][assignment_id] = {
+              submitted_at: submitted_at,
+              score: score
+            };
+          }
+      
+          const results = [];
+      
+          // Check for each learner who has submissions
+          for (const learner_id in learners_submissions) {
+            const learner_submissions = learners_submissions[learner_id];
+      
+            let total_score = 0;
+            let learner_total_points_possible = 0;
+            const per_assignment_scores = {};
+      
+            for (const assignment_id_str in assignments_map) {
+              const assignment_id = Number(assignment_id_str);
+              const assignment = assignments_map[assignment_id];
+              const points_possible = assignment.points_possible;
+      
+              if (typeof points_possible !== 'number' || points_possible === 0) {
+                // Cannot /0 so skip this assignment
+                continue;
+              }
+      
+              learner_total_points_possible += points_possible;
+      
+              const submission = learner_submissions[assignment_id];
+              let adjusted_score = 0;
+      
+              if (submission) {
+                const due_at = new Date(assignment.due_at);
+                let score = submission.score;
+      
+                if (submission.submitted_at > due_at) {
+                  // Submission is late, deduct 10% of points possible on the assignment
+                  adjusted_score = score - 0.1 * points_possible;
+                  if (adjusted_score < 0) {
+                    adjusted_score = 0;
+                  }
+                } else {
+                  adjusted_score = score;
+                }
+      
+                // Making sure that the adjusted score is not more than the total points possible on the assignment to prevent an error
+                if (adjusted_score > points_possible) {
+                  adjusted_score = points_possible;
+                }
+              } else {
+                // No submission so score is zero
+                adjusted_score = 0;
+              }
+      
+              // Calculating the percentage score here
+              const percentage_score = adjusted_score / points_possible;
+      
+              per_assignment_scores[assignment_id] = percentage_score;
+      
+              total_score += adjusted_score;
+            }
+      
+            let avg = (learner_total_points_possible > 0) ? (total_score / learner_total_points_possible) : 0;
+      
+            const learner_result = { id: Number(learner_id), avg: avg };
+            for (const assignment_id in per_assignment_scores) {
+              learner_result[assignment_id] = per_assignment_scores[assignment_id];
+            }
+      
+            results.push(learner_result);
+          }
+      
+          return results;
+        } catch (error) {
+          console.error(error.message);
+          throw error;
+        }
+      }
+
+      
+      const CourseInfo = {
+        id: 451,
+        name: "SBA 308: JavaScript Fundamentals"
+      };
+
+      
+      const AssignmentGroup = {
+        id: 12345,
+        name: "SBA 308: JavaScript Fundamentals",
+        course_id: 451,
+        group_weight: 25,
+        assignments: [
+          {
+            id: 1,
+            name: "Declare a Variable",
+            due_at: "2023-01-25",
+            points_possible: 50
+          },
+          {
+            id: 2,
+            name: "Write a Function",
+            due_at: "2023-02-27",
+            points_possible: 150
+          },
+          {
+            id: 3,
+            name: "Code the World",
+            due_at: "3156-11-15",
+            points_possible: 500
+          }
+        ]
+      };
+
+      // The learner submission data from sandbox(test data)
+      const LearnerSubmissions = [
+        {
+          learner_id: 125,
+          assignment_id: 1,
+          submission: {
+            submitted_at: "2023-01-25",
+            score: 47
+          }
+        },
+        {
+          learner_id: 125,
+          assignment_id: 2,
+          submission: {
+            submitted_at: "2023-02-12",
+            score: 150
+          }
+        },
+        {
+          learner_id: 125,
+          assignment_id: 3,
+          submission: {
+            submitted_at: "2023-01-25",
+            score: 400
+          }
+        },
+        {
+          learner_id: 132,
+          assignment_id: 1,
+          submission: {
+            submitted_at: "2023-01-24",
+            score: 39
+          }
+        },
+        {
+          learner_id: 132,
+          assignment_id: 2,
+          submission: {
+            submitted_at: "2023-03-07",
+            score: 140
+          }
+        }
+      ];
+
+      // Displaying Input Data
+      document.getElementById('courseInfo').textContent = JSON.stringify(CourseInfo, null, 2);
+      document.getElementById('assignmentGroup').textContent = JSON.stringify(AssignmentGroup, null, 2);
+      document.getElementById('learnerSubmissions').textContent = JSON.stringify(LearnerSubmissions, null, 2);
+
+      // displaying the result
+      try {
+        const results = getLearnerData(CourseInfo, AssignmentGroup, LearnerSubmissions);
+        const outputDiv = document.getElementById('output');
+
+        if (results.length === 0) {
+          outputDiv.innerHTML = '<p>No results to display.</p>';
+        } else {
+          results.forEach(result => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'result';
+            resultDiv.innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+            outputDiv.appendChild(resultDiv);
+          });
+        }
+      } catch (error) {
+        const outputDiv = document.getElementById('output');
+        outputDiv.innerHTML = '<div class="error"><strong>Error:</strong> ' + error.message + '</div>';
+      }
+    </script>
+  </div>
+</body>
+</html>
